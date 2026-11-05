@@ -1,0 +1,48 @@
+# Testing
+
+Use the commands in [CONTRIBUTING](../CONTRIBUTING.md). Tests assert public outcomes through HTTP, Socket.IO, region-matching functions and browser-visible actor workflows. These browser interfaces were authorized for the modern-stack migration in issue #5. Internal services use real code and real disposable PostgreSQL, with direct fixture inserts used only for setup.
+
+`pnpm test:unit` covers saved-polygon matching, overlap resolution and nearest-center fallback. `pnpm test:integration` covers authentication/roles, pending-driver approval, notifications, claim competition, lifecycle and quoted-price synthetic charges/refunds, including sequential duplicate rejection and inherited unpriced orders. It does not prove all concurrent financial operations safe.
+
+`pnpm test:e2e` invokes `scripts/test-browser.mjs`. Each run creates a uniquely named tmpfs PostgreSQL container, random loopback API/web ports and random signing/database secrets, applies existing migrations, and uses the canonical region geometry for the viewable preview and a deliberately labelled small rectangle for automated edge-case fixtures; all accounts and orders are synthetic. It replaces any supplied database URL. Cleanup removes only the container and processes created by that invocation. Browser-visible checks cover role guards/error recovery, theme persistence/deep links/mobile navigation, real dispatcher-to-driver notification/claim/completion with 500→490 TMT, saved-region persistence/invalid drafts, bidirectional chat, session refresh/logout races and GPS continuity across route changes. More browser checks are added as review identifies material gaps. Assertions use independent literal outcomes rather than snapshots of component internals.
+
+Browser login fixtures use a distinct synthetic forwarded IP per browser context because the loopback proxy otherwise combines every test into one authentication rate-limit bucket. Attempts within one browser retain the same identity. The real throttle test still requires twenty rejected attempts followed by HTTP 429, while another browser remains unaffected. Production limits stay unchanged.
+
+The API fixture boundary is permitted for setup; successful workflows are checked through the browser and public endpoints. External Yandex maps are not mocked to claim vendor correctness: the default isolated suite deliberately has no key and tests usable list/coordinate fallbacks. Live vendor map rendering, native Android, suspended-browser delivery and every device/browser combination require separate verification. Persisted original-region deadlines, simultaneous global release, private expiry ON/OFF, HTTP/native inbox visibility and competing claims are covered in the release-audience suite.
+
+`pnpm preview:isolated` uses the same guarded setup but keeps it alive for inspection. Stop the process with Ctrl-C to remove its database. Credentials and URLs are written with owner-only permissions to ignored `.local/browser-context.json`; no shared credentials or production user/order records are copied. Playwright traces/screenshots are generated under ignored `test-results/`.
+
+The container CI job loads the web image as `tayyn-web-check`, builds `tayyn-api-check`, and runs `node scripts/test-container-startup.mjs`. The smoke check starts only uniquely named containers/network, validates compiled API startup through Nginx, modern and legacy deep-link HTML, and the Socket.IO handshake, then removes its own resources. Its database URL is deliberately unreachable: database behavior belongs to the disposable-database integration/browser suite, and this check verifies image startup and proxy routing.
+
+GPS eligibility uses server-recorded coordinates less than 60 seconds old. HTTP tests cover missing/stale GPS, explicit online selection, browsing/claim denial without charging, and trip completion after GPS loss. Socket tests cover expiry forcing persisted offline without changing trip availability, suppressed offers/live queues after balance or region changes and reconnect, and no automatic online restoration after a fresh report. Removing delivery-time revalidation deliberately made the stale-socket test receive an offer; the guard was restored. The backend validates reports, not browser permission or GPS hardware authenticity.
+
+The Geocoder HTTP suite uses a disposable database and intercepts only outbound Yandex HTTP requests. It checks actor ownership, fresh-GPS input, shared per-driver movement/time limits, the fleet reserve under concurrent requests, separate-process persistence, day rollover, optional licensed cache and provider timeout/backoff. The browser runner loads a guarded synthetic external-provider fixture in its backend process; all application routes and GPS/polygon writes stay real. Address browser fixtures create their own drivers and balances. Tests do not prove vendor credential or account entitlement. See [geocoding](geocoding.md).
+
+### Money command validation
+
+Order prices allow positive TMT amounts through 99,999,999.99 with at most two decimal places. Manual wallet changes allow nonzero signed amounts through 9,999,999,999.99; TOPUP/BONUS are positive, WITHDRAWAL is negative, and ADJUSTMENT accepts either direction. The resulting wallet must stay between zero and 9,999,999,999.99. Adjustments preserve enough headroom to refund any active trip debit. HTTP tests check rejected commands leave history unchanged and accepted cent values agree across the response, balance and socket event.
+
+### Driver deactivation
+
+The dispatcher account-removal command now deactivates access. User/driver IDs, wallet, ledger entries, chats and order attribution remain available to the dispatcher. An ACCEPTED, WAITING or STARTED trip rejects deactivation with 409 before any changes. Successful deactivation blocks the user, increments its credential generation, revokes refresh tokens/native leases and disconnects sockets. Driver approval, unblocking, password changes and device approval cannot clear the user-level block.
+
+### Retrying balance adjustments
+
+Every dispatcher balance-adjustment command requires a UUID `operationId`. Old dispatcher tabs must refresh after this deployment; missing IDs return 400 with refresh guidance. The UI retains an ID when the response is uncertain and reuses it on retry. Changing driver, amount, direction or note starts a different intent; confirmed success clears the previous ID.
+
+The ledger stores each actor/operation pair once. Parallel retries serialize before locking the driver/wallet. Matching retries return the original committed transaction and its resulting balance, even after later changes; mismatched driver, amount, type or note returns 409. A replay never broadcasts the old balance. Different dispatchers have separate operation scopes. Failed ledger writes roll back balance and operation ID, so the same command can retry safely. Post-commit room/stat broadcasts log failures without turning a committed change into an HTTP failure.
+
+The schema change is additive: nullable operation IDs preserve existing ledger entries. The column and concurrent unique index are separate Prisma migrations so PostgreSQL executes the index outside an implicit multi-statement transaction. Keep IDs/index on an application rollback; removing them would lose retry history.
+
+### Cancellation and manual completion
+
+Driver HTTP tests permit cancellation only in WAITING and reject ACCEPTED or STARTED without a refund. Dispatcher tests allow pre-start cancellation and reject STARTED with 409, preserving assignment, balance and ledger. Browser tests verify that a started order exposes manual completion with a required reason and no ordinary Cancel action. A concurrent dispatcher-cancellation/manual-completion test verifies that forbidden cancellation cannot refund the started trip while completion succeeds. Manual completion tests verify reason/actor attribution and no second debit; force-resolution uses the same driver-then-order lock order as completion and cancellation.
+
+### Global public queues and regional alerts
+
+Public order creation immediately opens HTTP queues and claims in every region. The original region alone receives the 20-second popup/native alert. Disposable HTTP/Socket.IO checks cover immediate remote claims, one winner across regions, global queue/count invalidation, legacy persisted deadlines, private expiry fallback and native alert targeting. Browser checks exercise already-open remote lists, orders:drivers scores, removal on claim/cancellation, private fallback without another popup, and public popup expiry while the order remains claimable. These rules do not enable FCM or verify physical-phone background delivery.
+
+
+### Dispatcher chat sound
+
+The disposable browser suite sends real driver HTTP messages through Socket.IO into same-browser tabs and separate browser contexts. It replaces only media playback and, in explicit failure cases, the unavailable browser API boundary. Checks cover the real subsecond asset, shared three-second burst limit and later recovery, visible/hidden conversations, banner replacement, cross-tab cancellation, pending Web Locks, older read cursors, logout, reconnect/reload and silent failure with visual alerts retained. These checks verify playback decisions and cancellation, not perceived loudness on a physical speaker. See issue #120.

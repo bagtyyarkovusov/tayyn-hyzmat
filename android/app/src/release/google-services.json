@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "88794458615",
+    "project_id": "tayyn-hyzmat",
+    "storage_bucket": "tayyn-hyzmat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88794458615:android:59dfe520f35881ebb526f2",
+        "android_client_info": {
+          "package_name": "io.openride.driver.test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbGJm_YqRrQBdY_ViGZDKIJmQ4gcuD7FI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88794458615:android:96a3861884c2b97db526f2",
+        "android_client_info": {
+          "package_name": "tayyn.hyzmat.production"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbGJm_YqRrQBdY_ViGZDKIJmQ4gcuD7FI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
